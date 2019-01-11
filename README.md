@@ -11,6 +11,6 @@ Users who receiving alerts maybe more than one.
 3. go run main.go
 
 ## Command telegram bot
-/start - start watching
-/stop - stop watching
-/sleep 120 - sleep 120 minutes
+/start - start watching  
+/stop - stop watching  
+/sleep 120 - sleep 120 minutes  
