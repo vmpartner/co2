@@ -58,8 +58,10 @@ func main() {
 		timeout, _ := app.Config.Section("serial").Key("timeout").Int()
 		c := &serial.Config{Name: port, Baud: baud, ReadTimeout: time.Second * time.Duration(timeout)}
 		s, _ := serial.OpenPort(c)
-		err := s.Close()
-		tools.CheckErr(err)
+		defer func() {
+			err := s.Close()
+			tools.CheckErr(err)
+		}()
 		for {
 			scanner := bufio.NewScanner(s)
 			for scanner.Scan() {
