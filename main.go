@@ -16,17 +16,17 @@ import (
 	"time"
 )
 
-func main() {
+type App struct {
+	DB         *gorm.DB
+	Bot        *telebot.Bot
+	Config     *ini.File
+	Topic      *topic.Topic
+	UserCh     map[int]chan interface{}
+	UserActive map[int]bool
+	UserSleep  map[int]time.Duration
+}
 
-	type App struct {
-		DB         *gorm.DB
-		Bot        *telebot.Bot
-		Config     *ini.File
-		Topic      *topic.Topic
-		UserCh     map[int]chan interface{}
-		UserActive map[int]bool
-		UserSleep  map[int]time.Duration
-	}
+func main() {
 
 	// Init
 	app := new(App)
@@ -58,7 +58,8 @@ func main() {
 		timeout, _ := app.Config.Section("serial").Key("timeout").Int()
 		c := &serial.Config{Name: port, Baud: baud, ReadTimeout: time.Second * time.Duration(timeout)}
 		s, _ := serial.OpenPort(c)
-		defer s.Close()
+		err := s.Close()
+		tools.CheckErr(err)
 		for {
 			scanner := bufio.NewScanner(s)
 			for scanner.Scan() {
@@ -73,37 +74,14 @@ func main() {
 	// Telegram bot
 	go func(app *App) {
 
+		userID, _ := app.Config.Section("telegram").Key("user").Int()
+		if userID > 0 {
+			go app.SubscribeToAlert(userID)
+		}
+
 		// Start watch alert
 		app.Bot.Handle("/start", func(m *telebot.Message) {
-			go func() {
-				app.UserActive[m.Sender.ID] = true
-				for {
-					if app.UserActive[m.Sender.ID] == false {
-						break
-					}
-					app.UserCh[m.Sender.ID] = make(chan interface{})
-					app.Topic.Register(app.UserCh[m.Sender.ID])
-					for value := range app.UserCh[m.Sender.ID] {
-						if app.UserSleep[m.Sender.ID] > 0 {
-							time.Sleep(app.UserSleep[m.Sender.ID])
-							app.UserSleep[m.Sender.ID] = time.Duration(0)
-							break
-						}
-						i, err := strconv.Atoi(value.(string))
-						tools.CheckErr(err)
-						warnValue, _ := app.Config.Section("values").Key("warn").Int()
-						if i > warnValue {
-							logs.Warn("SEND ALERT CO2: ", value)
-							_, err := app.Bot.Send(m.Sender, value)
-							tools.CheckErr(err)
-							timeout, _ := app.Config.Section("values").Key("timeout").Int()
-							sleep := time.Duration(timeout) * time.Minute
-							logs.Info("SLEEP ", sleep)
-							time.Sleep(sleep)
-						}
-					}
-				}
-			}()
+			go app.SubscribeToAlert(m.Sender.ID)
 		})
 
 		// Stop watch alert
@@ -129,4 +107,36 @@ func main() {
 
 	// Loop
 	select {}
+}
+
+func (app *App) SubscribeToAlert(userID int) {
+	app.UserActive[userID] = true
+	for {
+		if app.UserActive[userID] == false {
+			break
+		}
+		app.UserCh[userID] = make(chan interface{})
+		app.Topic.Register(app.UserCh[userID])
+		for value := range app.UserCh[userID] {
+			if app.UserSleep[userID] > 0 {
+				time.Sleep(app.UserSleep[userID])
+				app.UserSleep[userID] = time.Duration(0)
+				break
+			}
+			i, err := strconv.Atoi(value.(string))
+			tools.CheckErr(err)
+			warnValue, _ := app.Config.Section("values").Key("warn").Int()
+			if i > warnValue {
+				logs.Warn("SEND ALERT CO2: ", value)
+				user := telebot.User{}
+				user.ID = userID
+				_, err := app.Bot.Send(&user, value)
+				tools.CheckErr(err)
+				timeout, _ := app.Config.Section("values").Key("timeout").Int()
+				sleep := time.Duration(timeout) * time.Minute
+				logs.Info("SLEEP ", sleep)
+				time.Sleep(sleep)
+			}
+		}
+	}
 }
