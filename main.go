@@ -126,16 +126,29 @@ func (app *App) SubscribeToAlert(userID int) {
 				break
 			}
 			i, err := strconv.Atoi(value.(string))
+			valueStr := value.(string)
 			tools.CheckErr(err)
 			warnValue, _ := app.Config.Section("values").Key("warn").Int()
-			if i > warnValue {
-				logs.Warn("SEND ALERT CO2: ", value)
+			goodValue, _ := app.Config.Section("values").Key("good").Int()
+			if i >= warnValue {
+				logs.Warn("SEND ALERT: ", value)
 				user := telebot.User{}
 				user.ID = userID
-				_, err := app.Bot.Send(&user, value)
+				_, err := app.Bot.Send(&user, "🔥 OPEN WINDOW, CO2 BAD " + valueStr)
 				tools.CheckErr(err)
 				timeout, _ := app.Config.Section("values").Key("timeout").Int()
 				sleep := time.Duration(timeout) * time.Minute
+				logs.Info("SLEEP ", sleep)
+				time.Sleep(sleep)
+			}
+			if i <= goodValue {
+				logs.Warn("SEND OK: ", value)
+				user := telebot.User{}
+				user.ID = userID
+				_, err := app.Bot.Send(&user, "🌍 CLOSE WINDOW, CO2 GOOD " + valueStr)
+				tools.CheckErr(err)
+				timeout, _ := app.Config.Section("values").Key("timeout").Int()
+				sleep := time.Duration(timeout * 2) * time.Minute
 				logs.Info("SLEEP ", sleep)
 				time.Sleep(sleep)
 			}
