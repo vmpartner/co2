@@ -62,16 +62,16 @@ func main() {
 			err := s.Close()
 			tools.CheckErr(err)
 		}()
-		k := 0.0
+		k := 0
 		for {
-			k += 0.001
-			if k <= 0.0010 {
-				continue
-			}
 			scanner := bufio.NewScanner(s)
 			for scanner.Scan() {
 				value := scanner.Text()
 				logs.Info("CO2:", value)
+				if k < 10 {
+					k++
+					continue
+				}
 				app.Topic.Broadcast <- value
 				break
 			}
