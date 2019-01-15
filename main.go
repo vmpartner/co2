@@ -62,7 +62,12 @@ func main() {
 			err := s.Close()
 			tools.CheckErr(err)
 		}()
+		k := 0.0
 		for {
+			k += 0.001
+			if k <= 0.0010 {
+				continue
+			}
 			scanner := bufio.NewScanner(s)
 			for scanner.Scan() {
 				value := scanner.Text()
@@ -134,7 +139,7 @@ func (app *App) SubscribeToAlert(userID int) {
 				logs.Warn("SEND ALERT: ", value)
 				user := telebot.User{}
 				user.ID = userID
-				_, err := app.Bot.Send(&user, "🔥 CO2 BAD " + valueStr)
+				_, err := app.Bot.Send(&user, "🔥 CO2 BAD "+valueStr)
 				tools.CheckErr(err)
 				timeout, _ := app.Config.Section("values").Key("timeout").Int()
 				sleep := time.Duration(timeout) * time.Minute
@@ -145,10 +150,10 @@ func (app *App) SubscribeToAlert(userID int) {
 				logs.Warn("SEND OK: ", value)
 				user := telebot.User{}
 				user.ID = userID
-				_, err := app.Bot.Send(&user, "🌍 CO2 GOOD " + valueStr)
+				_, err := app.Bot.Send(&user, "🌍 CO2 GOOD "+valueStr)
 				tools.CheckErr(err)
 				timeout, _ := app.Config.Section("values").Key("timeout").Int()
-				sleep := time.Duration(timeout * 2) * time.Minute
+				sleep := time.Duration(timeout*2) * time.Minute
 				logs.Info("SLEEP ", sleep)
 				time.Sleep(sleep)
 			}
